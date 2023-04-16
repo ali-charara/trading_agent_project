@@ -31,7 +31,10 @@ class TradingStockEnvironment:
         self.prev_portfolio_value = None
 
         # monitoring
-        ...
+        self.portfolio_history = []
+
+    def _update_history(self) -> None:
+        self.portfolio_history.append(self.get_portfolio_value())
 
     def _get_state(self) -> np.ndarray:
         return np.concatenate(
@@ -61,6 +64,8 @@ class TradingStockEnvironment:
         self.h = np.zeros(len(self.ticker))
         self.prev_portfolio_value = self.get_portfolio_value()
 
+        self._update_history()
+
         return self._get_state(), self._get_observation()
 
     def step(self, action):
@@ -76,11 +81,15 @@ class TradingStockEnvironment:
         assert self.b >= 0
 
         self.current_time += self.window_day_duration
+        reward = self._get_reward(action, prev_prices)
+        self.prev_portfolio_value = self.get_portfolio_value()
+
+        self._update_history()
 
         return (
             self._get_state(),
             self._get_observation(),
-            self._get_reward(action, prev_prices),
+            reward,
         )
 
     def render(self):
