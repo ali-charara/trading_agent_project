@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 from constants import (
     DEFAULT_TICKER,
@@ -34,7 +35,14 @@ class TradingStockEnvironment:
         self.portfolio_history = []
 
     def _update_history(self) -> None:
-        self.portfolio_history.append(self.get_portfolio_value())
+        self.portfolio_history.extend(
+            [
+                self.get_portfolio_value(t)
+                for t in range(
+                    self.current_time, self.current_time + self.window_day_duration
+                )
+            ]
+        )
 
     def _get_state(self) -> np.ndarray:
         return np.concatenate(
@@ -50,19 +58,19 @@ class TradingStockEnvironment:
 
     def _get_reward(self, action, prices) -> float:
         return (
-            self.get_portfolio_value()
+            self.get_portfolio_value(self.current_time)
             - self.prev_portfolio_value
             - action @ prices * TRANSACTION_COST_PERCENTAGE
         )
 
-    def get_portfolio_value(self) -> float:
-        return self.b + self.stocks_df["Adj Close"].loc[self.current_time] @ self.h
+    def get_portfolio_value(self, t) -> float:
+        return self.b + self.stocks_df["Adj Close"].loc[t] @ self.h
 
     def reset(self, initial_fund: int):
         self.current_time = self.window_day_duration
         self.b = initial_fund
         self.h = np.zeros(len(self.ticker))
-        self.prev_portfolio_value = self.get_portfolio_value()
+        self.prev_portfolio_value = self.get_portfolio_value(self.current_time)
 
         self._update_history()
 
@@ -82,7 +90,7 @@ class TradingStockEnvironment:
 
         self.current_time += self.window_day_duration
         reward = self._get_reward(action, prev_prices)
-        self.prev_portfolio_value = self.get_portfolio_value()
+        self.prev_portfolio_value = self.get_portfolio_value(self.current_time)
 
         self._update_history()
 
@@ -92,5 +100,7 @@ class TradingStockEnvironment:
             reward,
         )
 
-    def render(self):
-        raise NotImplementedError
+    def render(self) -> None:
+        plt.plot(self.portfolio_history)
+
+        plt.show()
