@@ -1,12 +1,16 @@
 # fmt: off
-DEFAULT_TICKER = ("^DJI", "^IXIC", "AMZN",
-                  "GOOGL", "AAPL", "PFE", "AZN",
-                  "JNJ", "SNY")
+DEFAULT_TICKER = ("^DJI", "^IXIC", "AMZN", "GOOGL",
+                  "AAPL", "PFE", "AZN", "JNJ",
+                  "SNY")
 
 # fmt: on
 #! data string format must be "YYYY-MM-DD"
 START_DATE = "2009-01-01"
+TRANSITION_DATE = "2016-01-01"
 END_DATE = "2020-08-05"
 
-WINDOW_DAY_DURATION = 30 * 3
-TRANSACTION_COST_PERCENTAGE = .01
+INITIAL_FUND = 1_000_000
+MAX_SHARES_PER_STOCK = 100
+TRANSACTION_FEE_PERCENTAGE = 0.01
+TURBULENCE_THRESHOLD = 140
+TRADING_WINDOW_DAY_DURATION = 30 * 3

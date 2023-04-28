@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from stockstats import StockDataFrame
 
@@ -60,3 +61,21 @@ def add_technical_indicators(market_dataframe: pd.DataFrame):
     )
 
     return market_dataframe
+
+
+def calcualte_turbulence(market_dataframe: pd.DataFrame) -> pd.Series:
+    prices_df = market_dataframe["Adj Close"]
+    hist_mean_df = prices_df.cumsum() / np.array(
+        list(range(1, market_dataframe.shape[0] + 1))
+    ).reshape(-1, 1)
+    start_index = 33
+    turbulences = [0] * start_index
+    for timestamp in range(start_index, market_dataframe.shape[0]):
+        hist_cov = prices_df.iloc[:timestamp].cov()
+        hist_mean = hist_mean_df.iloc[timestamp]
+        prices = prices_df.iloc[timestamp]
+        turbulences.append(
+            (prices - hist_mean) @ np.linalg.pinv(hist_cov) @ (prices - hist_mean)
+        )
+
+    return pd.Series(turbulences, index=market_dataframe.index)
