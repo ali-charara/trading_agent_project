@@ -1,8 +1,14 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from constants import (DEFAULT_TICKER, INITIAL_FUND, MAX_SHARES_PER_STOCK,
-                       START_DATE, TRADING_WINDOW_DAY_DURATION,
-                       TRANSACTION_FEE_PERCENTAGE, TRANSITION_DATE)
+from constants import (
+    DEFAULT_TICKER,
+    INITIAL_FUND,
+    MAX_SHARES_PER_STOCK,
+    START_DATE,
+    TRADING_WINDOW_DAY_DURATION,
+    TRANSACTION_FEE_PERCENTAGE,
+    TRANSITION_DATE,
+)
 from gym import Env, spaces
 from indicators import add_technical_indicators
 from utils import load_stocks
@@ -15,10 +21,11 @@ class TrainStockEnvironment(Env):
         start_date: str = START_DATE,
         end_date: str = TRANSITION_DATE,
         initial_fund: float = INITIAL_FUND,
+        max_shares_per_stock: int = MAX_SHARES_PER_STOCK,
         window_day_duration: int = TRADING_WINDOW_DAY_DURATION,
     ) -> None:
         # gym env
-        super(TrainStockEnvironment).__init__()
+        super().__init__()
         self.observation_space = spaces.Box(
             low=-3000, high=np.inf, shape=(len(ticker) * 6 + 1,)
         )
@@ -32,8 +39,9 @@ class TrainStockEnvironment(Env):
 
         # investment strategy
         self.initial_fund = initial_fund
-        self.current_time = window_day_duration
+        self.current_time = max(2, window_day_duration)
         self.window_day_duration = window_day_duration
+        self.max_shares_per_stock = max_shares_per_stock
         self.b = None
         self.h = None
         self.prev_b = None
@@ -41,23 +49,25 @@ class TrainStockEnvironment(Env):
 
         # monitoring
         self.portfolio_history = []
+        self.shares_history = []
+        self.reward_history = []
 
     def _update_history(self) -> None:
-        self.portfolio_history.extend(
-            [
+        h_copy = self.h.copy()
+        for t in range(
+            self.current_time,
+            min(
+                self.current_time + self.window_day_duration,
+                self.stocks_df.shape[0] - 1,
+            ),
+        ):
+            self.portfolio_history.append(
                 self.get_portfolio_value(self.b, self._get_prices(t), self.h)
-                for t in range(
-                    self.current_time,
-                    min(
-                        self.current_time + self.window_day_duration,
-                        self.stocks_df.shape[0] - 1,
-                    ),
-                )
-            ]
-        )
+            )
+            self.shares_history.append(h_copy)
 
     def _sell_stock(
-        self, stock_index: int, stock_prices: np.ndarray, sell_action: int
+        self, stock_index: int, sell_action: int, stock_prices: np.ndarray
     ) -> None:
         """Performs sell action based on the sign of the action
 
@@ -76,7 +86,7 @@ class TrainStockEnvironment(Env):
             self.h[stock_index] -= sold_shares
 
     def _buy_stock(
-        self, stock_index: int, stock_prices: np.ndarray, buy_action: int
+        self, stock_index: int, buy_action: int, stock_prices: np.ndarray
     ) -> None:
         """Performs buy action based on the sign of the action
 
@@ -106,7 +116,7 @@ class TrainStockEnvironment(Env):
             .to_numpy()
         )
 
-    def _get_reward(self, prev_prices, prices) -> float:
+    def _get_reward(self, prev_prices: np.ndarray, prices: np.ndarray) -> float:
         return self.get_portfolio_value(
             self.b, prices, self.h
         ) - self.get_portfolio_value(self.prev_b, prev_prices, self.prev_h)
@@ -115,46 +125,54 @@ class TrainStockEnvironment(Env):
         return {}
 
     @staticmethod
-    def get_portfolio_value(balance, prices, shares) -> float:
+    def get_portfolio_value(
+        balance: float, prices: np.ndarray, shares: np.ndarray
+    ) -> float:
         return balance + prices @ shares
 
     def reset(self) -> np.ndarray:
-        self.current_time = self.window_day_duration
+        self.current_time = max(2, self.window_day_duration)
         self.b = self.initial_fund
         self.h = np.zeros(len(self.ticker))
-        self.portfolio_history.append(self.initial_fund)
+
+        self.portfolio_history = [self.initial_fund]
+        self.shares_history = [self.h.copy()]
+        self.reward_history = []
 
         return np.concatenate((self._get_state(), self._get_observation()))
 
-    def step(self, action) -> tuple[np.ndarray, float, bool, dict]:
+    def step(self, action: np.ndarray) -> tuple[np.ndarray, float, bool, dict]:
         prev_prices = self._get_prices(self.current_time)
         self.prev_b = self.b
         self.prev_h = self.h.copy()
 
         # perform action
-        action = np.floor(action * MAX_SHARES_PER_STOCK)
+        action = np.round(action * self.max_shares_per_stock)
         argsort_actions = np.argsort(action)
         sell_indexes = argsort_actions[: np.where(action < 0)[0].shape[0]]
-        buy_indexes = argsort_actions[::-1][: np.where(action > 0)[0].shape[0]]
+        buy_indexes = argsort_actions[::-1][: np.where(action >= 0)[0].shape[0]]
         for index in sell_indexes:
-            self._sell_stock(index, prev_prices, action[index])
+            self._sell_stock(index, action[index], prev_prices)
 
         for index in buy_indexes:
-            self._buy_stock(index, prev_prices, action[index])
+            self._buy_stock(index, action[index], prev_prices)
 
         self._update_history()
 
         self.current_time += self.window_day_duration
         self.current_time = min(self.current_time, self.stocks_df.shape[0] - 1)
 
+        reward = self._get_reward(prev_prices, self._get_prices(self.current_time))
+        self.reward_history.append(reward)
+
         return (
             np.concatenate((self._get_state(), self._get_observation())),
-            self._get_reward(prev_prices, self._get_prices(self.current_time)),
+            reward,
             self.current_time >= self.stocks_df.shape[0] - 1,
             self._get_info(),
         )
 
     def render(self) -> None:
         plt.plot(self.portfolio_history)
-        
+
         plt.show()
