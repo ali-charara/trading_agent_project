@@ -1,3 +1,8 @@
+# cache
 **/__pycache__/
 
-*.ipynb
+# IDE
+.vscode/
+
+# sandbox
+sandbox/
