@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from gym import Env, spaces
+
 from constants import (
     DEFAULT_TICKER,
     INITIAL_FUND,
@@ -9,7 +11,6 @@ from constants import (
     TRANSACTION_FEE_PERCENTAGE,
     TRANSITION_DATE,
 )
-from gym import Env, spaces
 from indicators import add_technical_indicators
 from utils import load_stocks
 

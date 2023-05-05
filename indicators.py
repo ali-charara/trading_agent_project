@@ -5,6 +5,7 @@ from stockstats import StockDataFrame
 
 def add_technical_indicators(market_dataframe: pd.DataFrame):
     stocks_dataframe = market_dataframe.swaplevel(i=0, j=1, axis=1)
+
     ticker_list = stocks_dataframe.columns.levels[0].tolist()
 
     macd = pd.DataFrame()

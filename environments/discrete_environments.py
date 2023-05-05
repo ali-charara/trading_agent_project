@@ -1,4 +1,6 @@
 import numpy as np
+from gym import spaces
+
 from constants import (
     DEFAULT_TICKER,
     END_DATE,
@@ -8,7 +10,6 @@ from constants import (
     TRANSITION_DATE,
     TURBULENCE_THRESHOLD,
 )
-from gym import spaces
 from utils import number_to_base
 
 from .trade_environment import TradingStockEnvironment
@@ -57,7 +58,7 @@ class DiscreteStockEnvironment(TrainStockEnvironment):
                 )
             )
             - self.max_shares_per_stock
-        )
+        ) / self.max_shares_per_stock
 
         return super().step(final_action)
 
@@ -95,6 +96,6 @@ class DiscreteTradingEnvironment(TradingStockEnvironment):
                 )
             )
             - self.max_shares_per_stock
-        )
+        ) / self.max_shares_per_stock
 
         return super().step(final_action)

@@ -1,4 +1,5 @@
 import numpy as np
+
 from constants import (
     DEFAULT_TICKER,
     END_DATE,
