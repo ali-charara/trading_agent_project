@@ -2,3 +2,9 @@ numpy
 pandas
 yfinance
 stockstats
+stable_baselines3
+torch
+gym
+matplotlib
+ipython
+ipykernel
