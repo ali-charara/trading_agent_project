@@ -77,6 +77,9 @@ class TradingStockEnvironment(TrainStockEnvironment):
         return next_state
 
     def step(self, action) -> tuple[np.ndarray, float, bool, dict]:
+        if self.turbulence >= self.turbulence_threshold:
+            action = -np.ones(len(self.ticker))
+
         next_state, reward, done, info = super().step(action)
         self.turbulence = self.turbulence_df.iloc[self.current_time]
 

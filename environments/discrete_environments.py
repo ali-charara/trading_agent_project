@@ -25,7 +25,8 @@ class DiscreteStockEnvironment(TrainStockEnvironment):
 
     The action space of this specific environment is discrete as in the
     Reinforcement Learning Course of CentraleSupélec. However, we'll deal
-    with continuous State Representation instead of encoding tiling.
+    with continuous State Representation instead of tiling encoding due to
+    the high dimension of the state space.
     """
 
     def __init__(

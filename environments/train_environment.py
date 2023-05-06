@@ -1,3 +1,5 @@
+from typing import Optional
+
 import matplotlib.pyplot as plt
 import numpy as np
 from gym import Env, spaces
@@ -10,6 +12,7 @@ from constants import (
     TRADING_WINDOW_DAY_DURATION,
     TRANSACTION_FEE_PERCENTAGE,
     TRANSITION_DATE,
+    FIGSIZE,
 )
 from indicators import add_technical_indicators
 from utils import load_stocks
@@ -51,6 +54,7 @@ class TrainStockEnvironment(Env):
         # monitoring
         self.portfolio_history = []
         self.shares_history = []
+        self.balance_history = []
         self.reward_history = []
 
     def _update_history(self) -> None:
@@ -66,6 +70,7 @@ class TrainStockEnvironment(Env):
                 self.get_portfolio_value(self.b, self._get_prices(t), self.h)
             )
             self.shares_history.append(h_copy)
+            self.balance_history.append(self.b)
 
     def _sell_stock(
         self, stock_index: int, sell_action: int, stock_prices: np.ndarray
@@ -74,8 +79,8 @@ class TrainStockEnvironment(Env):
 
         Args:
             stock_index (int): stock index concerned by the sell action
-            stock_prices (np.ndarray): stock prices array
             sell_action (int): associated sell action
+            stock_prices (np.ndarray): stock prices array
         """
         if self.h[stock_index] > 0:
             sold_shares = min(-sell_action, self.h[stock_index])
@@ -93,10 +98,12 @@ class TrainStockEnvironment(Env):
 
         Args:
             stock_index (int): stock index concerned by the buy action
-            stock_prices (np.ndarray): stock prices array
             buy_action (int): associated buy action
+            stock_prices (np.ndarray): stock prices array
         """
-        available_amount = self.b // stock_prices[stock_index]
+        available_amount = self.b // (
+            stock_prices[stock_index] * (1 + TRANSACTION_FEE_PERCENTAGE)
+        )
         bought_shares = min(available_amount, buy_action)
 
         self.b -= (
@@ -138,6 +145,7 @@ class TrainStockEnvironment(Env):
 
         self.portfolio_history = [self.initial_fund]
         self.shares_history = [self.h.copy()]
+        self.balance_history = [self.b]
         self.reward_history = []
 
         return np.concatenate((self._get_state(), self._get_observation()))
@@ -173,7 +181,50 @@ class TrainStockEnvironment(Env):
             self._get_info(),
         )
 
-    def render(self) -> None:
-        plt.plot(self.portfolio_history)
+    def render(
+        self, agent_name: str, benchmark_weights: Optional[dict[str, np.ndarray]] = None
+    ) -> None:
+        fig, axes = plt.subplots(1, 2, figsize=FIGSIZE)
+
+        fig.suptitle(
+            f"Investment Strategy of {agent_name} agent rebalancing every {self.window_day_duration} day(s)"
+        )
+
+        axes[0].plot(
+            (np.array(self.portfolio_history) - self.initial_fund) / self.initial_fund,
+            label=agent_name,
+        )
+        axes[0].set_title("Portfolio return")
+        axes[0].set_xlabel("day")
+        axes[0].set_ylabel("Cumulative Return")
+
+        if benchmark_weights is not None:
+            for method, weights in benchmark_weights.items():
+                axes[0].plot(
+                    (
+                        self.stocks_df["Adj Close"]
+                        / self.stocks_df["Adj Close"].iloc[0]
+                        - 1
+                    )
+                    @ weights,
+                    label=method,
+                )
+
+            axes[0].legend(loc=2)
+
+        if hasattr(self, "turbulence_df"):
+            ax_turbulence = axes[0].twinx()
+            ax_turbulence.plot(self.turbulence_df, "r--", alpha=0.25)
+            ax_turbulence.set_ylabel("turbulence")
+
+        axes[1].plot(np.vstack(self.shares_history))
+        axes[1].set_title("Shares hold")
+        axes[1].set_xlabel("day")
+        axes[1].set_ylabel("Shares")
+        axes[1].legend(self.ticker, loc=2)
+
+        ax_balance = axes[1].twinx()
+        ax_balance.plot(self.balance_history, "r--", alpha=0.25)
+        ax_balance.set_ylabel("Remaining balance")
 
         plt.show()
